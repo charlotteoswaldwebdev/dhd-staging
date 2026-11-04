@@ -60,3 +60,8 @@ land correctly.
 > Cloudways' git deployment *removes* files in the deployment path that are
 > absent from the repo. If it does, `wp-content/uploads` and the untracked
 > plugins would be at risk, and the deployment path must be narrowed instead.
+
+## Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Cloudways Git deployment
+setup and the safety test that must be run before the first deploy.

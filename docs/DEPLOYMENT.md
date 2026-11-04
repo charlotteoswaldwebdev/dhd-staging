@@ -88,11 +88,57 @@ button does not.
 
 ---
 
-## Note: deployment is manual
+## Deploy on push (GitHub Actions) — the current method
 
-Cloudways' Git deployment is pull-based and triggered by a button in the
-panel. Pushing to `main` does **not** deploy on its own unless you wire up
-their API or a webhook.
+`.github/workflows/deploy.yml` rsyncs the four tracked paths to staging on
+every push to `main` that touches `wp-content/`. It replaces clicking Deploy
+in the Cloudways panel, and unlike that button it does **not** copy repo meta
+files (`README.md`, `bin/`, `docs/`, `.github/`) into the webroot.
+
+### One-time setup
+
+1. **Add the deploy key to Cloudways.** Server Management → SSH Public Keys →
+   add the contents of `~/.ssh/dhd-deploy.pub`, labelled `github-actions`.
+2. **Add the private key to GitHub.** Repo → Settings → Secrets and variables
+   → Actions → New repository secret:
+   - Name: `DEPLOY_SSH_KEY`
+   - Value: the whole of `~/.ssh/dhd-deploy`, including the
+     `-----BEGIN`/`-----END` lines.
+3. **Disable Cloudways' Git deployment** so the two cannot fight, and remove
+   what it already left in the webroot:
+   ```bash
+   ssh dhd-cloudways 'cd /home/master/applications/rdxcacbyuw/public_html && rm -rf bin docs README.md'
+   ```
+
+### Why a separate key
+
+`~/.ssh/dhd-deploy` is a dedicated, passphrase-less ed25519 keypair used only
+by CI. Charlotte's personal key is not in GitHub Secrets, so revoking CI
+access is a matter of deleting one key in Cloudways.
+
+### Safety properties
+
+- The server's host key is **pinned** in the workflow. No
+  `StrictHostKeyChecking=no` anywhere — a changed host key fails the deploy.
+- `--delete` is scoped to the four tracked paths only.
+- Files in the `--exclude` list are **protected from deletion** on the server,
+  which is what preserves `automation-by-installatron.php` and
+  `elementor-safe-mode.php`. (rsync only deletes excluded files when given
+  `--delete-excluded`, which this workflow never passes.)
+- A `concurrency` group prevents two deploys running at once.
+
+### Dry run
+
+Actions tab → **Deploy to staging** → **Run workflow** → tick
+*Dry run*. It reports what would change without writing anything.
+
+---
+
+## Note: the Cloudways panel button is manual
+
+Cloudways' own Git deployment is pull-based and triggered by a button in the
+panel — pushing to `main` does not trigger it. That is the reason for the
+GitHub Actions workflow above. Keep one method, not both.
 
 ## Keeping the repo in step with the server
 

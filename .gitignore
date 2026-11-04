@@ -10,6 +10,7 @@
 # --- Ignore everything at the root ----------------------------
 /*
 !/.gitignore
+!/.github/
 !/README.md
 !/bin/
 !/docs/

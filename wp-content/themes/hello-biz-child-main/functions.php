@@ -41,14 +41,4 @@ add_action( 'woocommerce_after_shop_loop_item_title', function() {
     }
 }, 8 ); // Run before price (priority 10)
 
-/*
- * Add custom fields to WooCommerce variations data.
- * This allows the custom fields to be accessible in the frontend via JavaScript.
- */
-add_filter( 'woocommerce_available_variation', function ( $data, $product, $variation ) {
-	foreach ( [ 'voltage', 'amps', 'flow_rate' ] as $key ) {
-		$value = get_field( $key, $variation->get_id() );
-		$data[ $key ] = is_scalar( $value ) ? (string) $value : '';
-	}
-	return $data;
-}, 10, 3 );
+// The variation spec fields moved to mu-plugins/dhd-variation-specs/.

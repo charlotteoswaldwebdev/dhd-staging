@@ -1,14 +1,23 @@
 name: Deploy to staging
 
-# Deploys DHD's custom code to the Cloudways staging server over rsync.
+# Triggers Cloudways' own Git deployment via the Cloudways API when code is
+# pushed to main.
 #
-# Only the four tracked paths are synced. --delete keeps the server tidy
-# when files are removed from the repo, and the --exclude list below also
-# PROTECTS matching files on the server from deletion (rsync does not
-# delete excluded files unless --delete-excluded is passed). That is what
-# keeps the host-generated mu-plugins alive.
+# Why the API and not rsync over SSH: Cloudways restricts SSH/SFTP to
+# whitelisted IP addresses. GitHub-hosted runners come from a large, shifting
+# pool, so they cannot be whitelisted without effectively opening port 22 to
+# the internet. This workflow only makes an OUTBOUND HTTPS call to
+# api.cloudways.com, so the SSH whitelist is irrelevant.
 #
-# Required secret:  DEPLOY_SSH_KEY  — private half of the deploy keypair
+# Required secrets:
+#   CLOUDWAYS_ACCESS_TOKEN  — API Access Token, Limited Access / Git scope
+#   CLOUDWAYS_SERVER_ID
+#   CLOUDWAYS_APP_ID
+#
+# Prerequisite: Cloudways' own "Deployment via Git" must be CONFIGURED for
+# the app (repo + branch + deployment path), with Cloudways' deploy key added
+# to this GitHub repo. This workflow presses that button; it does not replace
+# the configuration.
 
 on:
   push:
@@ -17,84 +26,69 @@ on:
       - 'wp-content/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run — report changes without applying them'
-        type: boolean
-        default: false
 
-# Never let two deploys overlap.
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
 
-env:
-  SSH_HOST: 64.176.180.39
-  SSH_USER: master_swrzshgmkf
-  REMOTE_ROOT: /home/master/applications/rdxcacbyuw/public_html
-
 jobs:
   deploy:
-    name: rsync to staging
+    name: Trigger Cloudways deployment
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure SSH
+      - name: Check secrets are present
+        env:
+          TOKEN: ${{ secrets.CLOUDWAYS_ACCESS_TOKEN }}
+          SERVER_ID: ${{ secrets.CLOUDWAYS_SERVER_ID }}
+          APP_ID: ${{ secrets.CLOUDWAYS_APP_ID }}
         run: |
-          mkdir -p ~/.ssh
-          install -m 600 /dev/null ~/.ssh/id_ed25519
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
-          # Host key pinned deliberately. ssh refuses to connect on a mismatch,
-          # so there is no StrictHostKeyChecking=no anywhere in this workflow.
-          printf '%s\n' '64.176.180.39 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKp/lVB8G+3nTLiX2JRM6kntJMKgQ/IG28W2oHAJZE7w' > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Verify connection
-        run: |
-          ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "test -d '$REMOTE_ROOT/wp-content' && echo 'connected, wp-content found'"
-
-      - name: Deploy
-        run: |
-          PATHS=(
-            mu-plugins
-            themes/hello-biz-child-main
-            themes/hello-theme-child-master
-            plugins/heat-loss-calculator
-          )
-
-          EXCLUDES=(
-            --exclude=.git
-            --exclude=.duckversions
-            --exclude=.DS_Store
-            --exclude=node_modules
-            --exclude=automation-by-installatron.php
-            --exclude=elementor-safe-mode.php
-            --exclude='*.log'
-            --exclude='*.bak'
-            --exclude='*.orig'
-          )
-
-          FLAGS=(-az --delete --itemize-changes --human-readable)
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            FLAGS+=(--dry-run)
-            echo "::notice::DRY RUN — nothing will be written"
-          fi
-
-          for p in "${PATHS[@]}"; do
-            echo "::group::wp-content/$p"
-            rsync "${FLAGS[@]}" "${EXCLUDES[@]}" \
-              "wp-content/$p/" \
-              "$SSH_USER@$SSH_HOST:$REMOTE_ROOT/wp-content/$p/"
-            echo "::endgroup::"
+          missing=0
+          for v in TOKEN SERVER_ID APP_ID; do
+            if [[ -z "${!v}" ]]; then
+              echo "::error::Secret for $v is not set"
+              missing=1
+            fi
           done
+          exit $missing
 
-      - name: Flush caches
-        if: ${{ inputs.dry_run != true }}
-        continue-on-error: true
+      - name: Trigger Git pull
+        env:
+          TOKEN: ${{ secrets.CLOUDWAYS_ACCESS_TOKEN }}
+          SERVER_ID: ${{ secrets.CLOUDWAYS_SERVER_ID }}
+          APP_ID: ${{ secrets.CLOUDWAYS_APP_ID }}
+          GIT_URL: git@github.com:charlotteoswaldwebdev/dhd-staging.git
+          BRANCH: main
         run: |
-          ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "cd '$REMOTE_ROOT' && wp cache flush --quiet && echo 'object cache flushed'"
+          # The API Access Token is used directly as a Bearer token. The old
+          # /oauth/access_token exchange is for the legacy API Key, which
+          # Cloudways is retiring.
+          response=$(curl -sS --max-time 60 -w $'\n%{http_code}' \
+            -X POST 'https://api.cloudways.com/api/v1/git/pull' \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode "server_id=${SERVER_ID}" \
+            --data-urlencode "app_id=${APP_ID}" \
+            --data-urlencode "git_url=${GIT_URL}" \
+            --data-urlencode "branch_name=${BRANCH}")
+
+          status=$(printf '%s' "$response" | tail -n1)
+          body=$(printf '%s' "$response" | sed '$d')
+
+          echo "HTTP ${status}"
+          printf '%s\n' "$body"
+
+          case "$status" in
+            2*)
+              echo "::notice::Deployment requested. Check Application → Deployment via Git → logs in the Cloudways panel to confirm it completed."
+              ;;
+            401|403)
+              echo "::error::Cloudways rejected the token (HTTP ${status}). Check CLOUDWAYS_ACCESS_TOKEN is current and has the Git scope."
+              exit 1
+              ;;
+            *)
+              echo "::error::Cloudways API returned HTTP ${status}"
+              exit 1
+              ;;
+          esac

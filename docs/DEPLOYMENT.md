@@ -88,49 +88,95 @@ button does not.
 
 ---
 
-## Deploy on push (GitHub Actions) — the current method
+## Deploy on push — the current method
 
-`.github/workflows/deploy.yml` rsyncs the four tracked paths to staging on
-every push to `main` that touches `wp-content/`. It replaces clicking Deploy
-in the Cloudways panel, and unlike that button it does **not** copy repo meta
-files (`README.md`, `bin/`, `docs/`, `.github/`) into the webroot.
+`.github/workflows/deploy.yml` calls the **Cloudways API** on every push to
+`main` that touches `wp-content/`, which triggers Cloudways' own Git
+deployment. Cloudways then pulls from GitHub and deploys.
+
+### Why not rsync over SSH
+
+The first attempt rsynced from the GitHub runner straight to the server. It
+failed with `connect to host 64.176.180.39 port 22: Connection timed out` —
+a network-level block, not an auth failure.
+
+Cloudways restricts SSH/SFTP to **whitelisted IP addresses**. GitHub-hosted
+runners come from a large, constantly changing pool published at
+`api.github.com/meta`, so whitelisting them would mean allowing SSH from
+every GitHub Actions runner in the world. That defeats the whitelist, so the
+approach was abandoned rather than weakened.
+
+The API call is outbound HTTPS from the runner to `api.cloudways.com`, so the
+SSH whitelist is irrelevant to it.
 
 ### One-time setup
 
-1. **Add the deploy key to Cloudways.** Server Management → SSH Public Keys →
-   add the contents of `~/.ssh/dhd-deploy.pub`, labelled `github-actions`.
-2. **Add the private key to GitHub.** Repo → Settings → Secrets and variables
-   → Actions → New repository secret:
-   - Name: `DEPLOY_SSH_KEY`
-   - Value: the whole of `~/.ssh/dhd-deploy`, including the
-     `-----BEGIN`/`-----END` lines.
-3. **Disable Cloudways' Git deployment** so the two cannot fight, and remove
-   what it already left in the webroot:
-   ```bash
-   ssh dhd-cloudways 'cd /home/master/applications/rdxcacbyuw/public_html && rm -rf bin docs README.md'
-   ```
+1. **Keep Cloudways' Git deployment configured.** Application → Deployment
+   via Git, with repo, branch `main`, and deployment path blank. The workflow
+   presses that button over the API; it does not replace the configuration.
+2. **Create an API Access Token.** Cloudways Platform → grid icon (bottom of
+   the left nav) → **API Integration** → **Create Access Token**. Name it
+   `GitHub Actions deploy`, and choose **Limited Access** with only the Git
+   operation. The token is shown **once** — copy it immediately.
+3. **Add three GitHub secrets** (repo → Settings → Secrets and variables →
+   Actions):
 
-### Why a separate key
+   | Secret | Value |
+   |---|---|
+   | `CLOUDWAYS_ACCESS_TOKEN` | the token from step 2 |
+   | `CLOUDWAYS_SERVER_ID` | `1657598` |
+   | `CLOUDWAYS_APP_ID` | `6759210` |
 
-`~/.ssh/dhd-deploy` is a dedicated, passphrase-less ed25519 keypair used only
-by CI. Charlotte's personal key is not in GitHub Secrets, so revoking CI
-access is a matter of deleting one key in Cloudways.
+   The IDs come from Cloudways' URL convention — the server hostname is
+   `1657598.cloudwaysapps.com` and the app's temporary URL is
+   `wordpress-1657598-6759210.cloudwaysapps.com`. Confirm them against the
+   panel URL when you open the server and the application.
 
-### Safety properties
+### API details
 
-- The server's host key is **pinned** in the workflow. No
-  `StrictHostKeyChecking=no` anywhere — a changed host key fails the deploy.
-- `--delete` is scoped to the four tracked paths only.
-- Files in the `--exclude` list are **protected from deletion** on the server,
-  which is what preserves `automation-by-installatron.php` and
-  `elementor-safe-mode.php`. (rsync only deletes excluded files when given
-  `--delete-excluded`, which this workflow never passes.)
-- A `concurrency` group prevents two deploys running at once.
+Authentication uses the Access Token **directly as a Bearer token**. The
+`/oauth/access_token` exchange seen in older examples belongs to the legacy
+API Key, which Cloudways is retiring.
 
-### Dry run
+```
+POST https://api.cloudways.com/api/v1/git/pull
+Authorization: Bearer <access token>
+Content-Type: application/x-www-form-urlencoded
 
-Actions tab → **Deploy to staging** → **Run workflow** → tick
-*Dry run*. It reports what would change without writing anything.
+server_id, app_id, git_url, branch_name   (deploy_path optional)
+```
+
+Tokens expire. When deploys start failing with HTTP 401 or 403, the token has
+lapsed — create a new one and update the secret.
+
+### Verifying a deploy landed
+
+The API call only *requests* a deployment, so a green workflow run means
+"accepted", not "finished". To confirm the server actually matches the repo:
+
+```bash
+./bin/verify-sync.sh
+```
+
+Or read Application → Deployment via Git → logs in the Cloudways panel.
+
+### The webroot side effect
+
+Cloudways copies the **whole repo root** into the deployment path, so
+`README.md`, `bin/` and `docs/` land in `public_html`. On staging they are
+behind basic auth, but they name the server, the master username and the app
+ID, so deny them explicitly. Add to `public_html/.htaccess`, above the
+WordPress block:
+
+```apache
+# Keep repo metadata out of reach
+<FilesMatch "^(README\.md|\.gitignore)$">
+  Require all denied
+</FilesMatch>
+RedirectMatch 404 ^/(bin|docs|\.github|\.git)(/|$)
+```
+
+`.htaccess` is not tracked in this repo, so a deploy will not overwrite it.
 
 ---
 

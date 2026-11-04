@@ -1,0 +1,63 @@
+/*
+Theme Name: Hello Biz Child
+Theme URI: https://github.com/elementor/hello-biz-child/
+Description: Hello Biz Child is a child theme of Hello Biz, created by Elementor team
+Author: Elementor Team
+Template: hello-biz
+Author URI: https://elementor.com/?utm_source=wp-themes&utm_campaign=author-uri&utm_medium=wp-dash
+Version: 1.0.0
+Stable tag: 1.0.0
+Requires at least: 6.0
+Tested up to: 6.5
+Requires PHP: 7.4
+License: GNU General Public License v3 or later.
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
+Text Domain: hello-biz-child
+Tags: flexible-header, custom-colors, custom-menu, custom-logo, featured-images, rtl-language-support, threaded-comments, translation-ready, style-variations
+*/
+
+/* Add your custom styles here */
+
+.product-sku {
+  font-size: 12px;
+  color: #666;
+  margin: 5px 0;
+}
+
+body:not(.home) .page-header {
+  margin: 60px 0;
+}
+
+/* Map WooCommerce block tokens onto Elementor globals */
+body {
+  --wc-primary: var(--e-global-color-primary);
+  --woocommerce: var(--e-global-color-primary);
+  --wc-secondary: var(--e-global-color-secondary);
+  --wc-highlight: var(--e-global-color-accent);
+}
+
+/* Body typography inside cart/checkout blocks */
+.wp-block-woocommerce-checkout,
+.wp-block-woocommerce-cart,
+.wc-block-components-form,
+.wc-block-components-text-input input,
+.wc-block-components-textarea,
+.wc-block-components-button {
+  font-family: var(--e-global-typography-text-font-family), sans-serif;
+  color: var(--e-global-color-text);
+}
+
+/* Section headings */
+.wc-block-components-title,
+.wp-block-woocommerce-checkout :is(h1, h2, h3) {
+  font-family: var(--e-global-typography-primary-font-family), sans-serif;
+  color: var(--e-global-color-secondary);
+}
+
+/* Primary actions */
+.wc-block-components-button:not(.is-link),
+.wc-block-components-checkout-place-order-button {
+  background-color: var(--e-global-color-accent);
+  color: #fff;
+  border-radius: 4px;
+}

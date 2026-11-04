@@ -1,0 +1,21 @@
+{
+    "name": "greynoise-design/heat-loss-calculator",
+    "description": "Heat Loss Calculator",
+    "type": "project",
+    "version": "1.0.0",
+    "license": "proprietary",
+    "authors": [{
+      "name": "Louis Linehan",
+      "email": "louis@greynoise.co.uk"
+    }],
+    "repositories": [
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+      "classmap": [
+      ]
+    },
+    "require": {
+        "setasign/fpdf": "dev-master"
+    }
+}

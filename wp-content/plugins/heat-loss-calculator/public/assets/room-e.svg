@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 218 137" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g id="Layer_2">
+        <g id="Layer_1-2">
+            <path d="M169,21.77L49,21.77L1,1L217,1L169,21.77Z" style="fill:white;fill-rule:nonzero;"/>
+            <path d="M169,115.23L49,115.23L1,136L217,136L169,115.23Z" style="fill:white;fill-rule:nonzero;"/>
+            <rect x="49" y="21.77" width="120" height="93.46" style="fill:white;"/>
+            <path d="M49,115.23L1,136L1,1L49,21.77L49,115.23Z" style="fill:white;fill-rule:nonzero;"/>
+            <path d="M169,115.23L217,136L217,1L169,21.77L169,115.23Z" style="fill:white;fill-rule:nonzero;"/>
+            <rect x="73" y="42.54" width="28.8" height="46.73"/>
+            <rect x="125.8" y="37.35" width="33.6" height="77.88"/>
+        </g>
+    </g>
+</svg>

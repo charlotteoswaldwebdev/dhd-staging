@@ -1,0 +1,61 @@
+# =============================================================
+# DHD staging — Cloudways Git deployment
+# Repo root mirrors /home/master/applications/rdxcacbyuw/public_html
+#
+# Principle: track ONLY code we wrote. WordPress core, third-party
+# plugins, parent themes, uploads, caches and secrets stay on the
+# server and are managed by WP's own updater.
+# =============================================================
+
+# --- Ignore everything at the root ----------------------------
+/*
+!/.gitignore
+!/README.md
+!/bin/
+!/wp-content/
+
+# --- wp-content: ignore all, then allow three dirs ------------
+/wp-content/*
+!/wp-content/mu-plugins/
+!/wp-content/themes/
+!/wp-content/plugins/
+
+# --- mu-plugins: ours, minus host/plugin-generated files ------
+/wp-content/mu-plugins/automation-by-installatron.php
+/wp-content/mu-plugins/elementor-safe-mode.php
+
+# --- themes: only our child themes ----------------------------
+# hello-biz + hello-elementor are third-party parents (wp.org)
+/wp-content/themes/*
+!/wp-content/themes/hello-biz-child-main/
+!/wp-content/themes/hello-theme-child-master/
+
+# --- plugins: only the one we wrote ---------------------------
+# 356M of Elementor/Woo/ACF etc. belongs to WP's updater, not git
+/wp-content/plugins/*
+!/wp-content/plugins/heat-loss-calculator/
+
+# --- Editor / plugin auto-backups -----------------------------
+**/.duckversions/
+**/*.bak
+**/*.orig
+**/*~
+
+# --- Build artefacts & local cruft ----------------------------
+**/node_modules/
+**/.sass-cache/
+**/.DS_Store
+**/Thumbs.db
+**/*.log
+**/debug.log
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Never commit secrets or dumps ----------------------------
+wp-config.php
+wp-config-local.php
+*.sql
+*.sql.gz
+*.pem
+*.key

@@ -18,6 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/dhd-variation-specs/variation-data.php';
 require_once __DIR__ . '/dhd-variation-specs/display.php';
+require_once __DIR__ . '/dhd-variation-specs/tab.php';
 
 /**
  * The specs shown, in display order.
